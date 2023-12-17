@@ -62,6 +62,27 @@ void Madoka::control(const ClimateCall &call) {
                             (uint8_t)((target >> 8) & 0xFF), (uint8_t)(target & 0xFF)}),
                     400);   
   }
+  if (call.get_fan_mode().has_value()) {
+    ClimateFanMode mode = *call.get_fan_mode();
+    uint8_t fan_speed_ = 255;
+    switch(mode) {
+        case climate::CLIMATE_FAN_LOW:
+            fan_speed_ = 1;
+            break;
+        case climate::CLIMATE_FAN_MEDIUM:
+            fan_speed_ = 3;
+            break;
+        case climate::CLIMATE_FAN_HIGH:
+            fan_speed_ = 5;
+            break;
+        default:
+            ESP_LOGW(TAG, "Unsupported fan mode: %d", mode);
+            break;
+    }
+    if(fan_speed_ != 255) {
+        this->query(BRC1H_FUNC_SET_FANSPEED message({0x20, 0x01, (uint8_t) mode_, 0x21, 0x01, (uint8_t) mode_}), 400);
+    }
+  }
   this->update();
 }
 
