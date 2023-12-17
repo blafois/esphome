@@ -72,7 +72,7 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
   uint16_t wwr_handle_;
   SemaphoreHandle_t query_semaphore_ = NULL;
   status cur_status_;
-  cur_status_.mode = -1; // undefined value while we did not get the actual value from the device itself
+  cur_status_->mode = -1; // undefined value while we did not get the actual value from the device itself
 
   std::vector<chunk> split_payload(message msg);
   message prepare_message(uint16_t cmd, message args);
@@ -115,7 +115,7 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
     traits.set_supports_current_temperature(true);
     traits.set_visual_current_temperature_step(1);    
     traits.set_supports_two_point_target_temperature(false);
-    
+
     return traits;
   }
   void set_unit_of_measurement(const char *);
