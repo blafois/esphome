@@ -72,8 +72,7 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
   uint16_t wwr_handle_;
   SemaphoreHandle_t query_semaphore_ = NULL;
   status cur_status_;
-  cur_status_->mode = -1; // undefined value while we did not get the actual value from the device itself
-
+  
   std::vector<chunk> split_payload(message msg);
   message prepare_message(uint16_t cmd, message args);
   void query(uint16_t cmd, message args, int t_d);
