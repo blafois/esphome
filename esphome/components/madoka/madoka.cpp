@@ -330,6 +330,7 @@ void Madoka::parse_cb(message msg) {
       }
       break;
     case BRC1H_FUNC_GET_FANSPEED:
+         ESP_LOGD(TAG, "[%s] Got fan speed return!", this->get_name().c_str());
         // depending on current mode, we consider cooling or heating fanspeed
         while (i < sz) {
             uint8_t a_id = msg[i++];
@@ -339,35 +340,50 @@ void Madoka::parse_cb(message msg) {
             // if we are in COOLING, we consider cooling fanspeed
             // if auto ... ?
             switch (a_id) {
-            case 0x20: { // Cooling FanSpeed
-                if(this->mode == climate::CLIMATE_MODE_COOL) {
-                    message val(msg.begin() + i, msg.begin() + i + len);
-                    switch(val[0]) {
-                        case 1: 
-                            this->fan_mode = climate::CLIMATE_FAN_LOW;
-                            break;
-                        case 2:
-                        case 3: 
-                        case 4:
-                            this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
-                            break;
-                        case 5: 
-                            this->fan_mode = climate::CLIMATE_FAN_HIGH;
-                            break;
-                        default:
-                            ESP_LOGW(TAG, "[%s] Unsupported fan speed", this->get_name().c_str());
-                            break;
+                case 0x20: { // Cooling FanSpeed
+                    if(this->mode == climate::CLIMATE_MODE_COOL) {
+                        message val(msg.begin() + i, msg.begin() + i + len);
+                        switch(val[0]) {
+                            case 1: 
+                                this->fan_mode = climate::CLIMATE_FAN_LOW;
+                                break;
+                            case 2:
+                            case 3: 
+                            case 4:
+                                this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
+                                break;
+                            case 5: 
+                                this->fan_mode = climate::CLIMATE_FAN_HIGH;
+                                break;
+                            default:
+                                ESP_LOGW(TAG, "[%s] Unsupported fan speed", this->get_name().c_str());
+                                break;
+                        }
                     }
+                    break;
                 }
-                break;
-            }
-            case 0x21: { // Heating FanSpeed
-                if(this->mode == climate::CLIMATE_MODE_HEAT) {
-                    message val(msg.begin() + i, msg.begin() + i + len);
-
+                case 0x21: { // Heating FanSpeed
+                    if(this->mode == climate::CLIMATE_MODE_HEAT) {
+                        message val(msg.begin() + i, msg.begin() + i + len);
+                        switch(val[0]) {
+                            case 1: 
+                                this->fan_mode = climate::CLIMATE_FAN_LOW;
+                                break;
+                            case 2:
+                            case 3: 
+                            case 4:
+                                this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
+                                break;
+                            case 5: 
+                                this->fan_mode = climate::CLIMATE_FAN_HIGH;
+                                break;
+                            default:
+                                ESP_LOGW(TAG, "[%s] Unsupported fan speed", this->get_name().c_str());
+                                break;
+                        }
+                    }
+                    break;
                 }
-                break;
-            }
             }
             i += len;
         }
