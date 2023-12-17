@@ -114,6 +114,8 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
     traits.set_visual_temperature_step(1);
     traits.set_supports_current_temperature(true);
     traits.set_visual_current_temperature_step(1);    
+    traits.set_supports_two_point_target_temperature(false);
+    
     return traits;
   }
   void set_unit_of_measurement(const char *);
