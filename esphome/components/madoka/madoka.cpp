@@ -80,7 +80,7 @@ void Madoka::control(const ClimateCall &call) {
             break;
     }
     if(fan_speed_ != 255) {
-        this->query(BRC1H_FUNC_SET_FANSPEED message({0x20, 0x01, (uint8_t) mode_, 0x21, 0x01, (uint8_t) mode_}), 400);
+        this->query(BRC1H_FUNC_SET_FANSPEED, message({0x20, 0x01, (uint8_t) mode_, 0x21, 0x01, (uint8_t) mode_}), 400);
     }
   }
   this->update();
