@@ -14,6 +14,19 @@
 #include <esp_gattc_api.h>
 
 #define MAX_CHUNK_SIZE 20
+
+#define BRC1H_FUNC_SET_SETTING_STATUS 0x4020
+#define BRC1H_FUNC_SET_OPERATION_MODE 0x4030
+#define BRC1H_FUNC_SET_SETPOINT 0x4040
+#define BRC1H_FUNC_SET_FANSPEED 0x4050
+
+#define BRC1H_FUNC_GET_SETTING_STATUS 0x0020
+#define BRC1H_FUNC_GET_OPERATION_MODE 0x0030
+#define BRC1H_FUNC_GET_SETPOINT 0x0040
+#define BRC1H_FUNC_GET_FANSPEED 0x0050
+#define BRC1H_FUNC_GET_SENSOR_INFORMATION 0x0110
+
+
 static const uint8_t BLE_SEND_MAX_RETRIES = 5;
 
 namespace esphome {
@@ -59,6 +72,7 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
   uint16_t wwr_handle_;
   SemaphoreHandle_t query_semaphore_ = NULL;
   status cur_status_;
+  cur_status_.mode = -1; // undefined value while we did not get the actual value from the device itself
 
   std::vector<chunk> split_payload(message msg);
   message prepare_message(uint16_t cmd, message args);
@@ -77,6 +91,7 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
   void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::DATA; }
+
   climate::ClimateTraits traits() override {
     auto traits = climate::ClimateTraits();
     traits.set_supported_modes({
@@ -87,11 +102,18 @@ class Madoka : public climate::Climate, public esphome::ble_client::BLEClientNod
         climate::CLIMATE_MODE_FAN_ONLY,
         climate::CLIMATE_MODE_DRY,
     });
+
+    traits.set_supported_fan_modes({
+        climate::CLIMATE_FAN_LOW,
+        climate::CLIMATE_FAN_MEDIUM,
+        climate::CLIMATE_FAN_HIGH,
+    });
+
     traits.set_visual_min_temperature(16);
     traits.set_visual_max_temperature(32);
     traits.set_visual_temperature_step(1);
-    traits.set_supports_two_point_target_temperature(true);
     traits.set_supports_current_temperature(true);
+    traits.set_visual_current_temperature_step(1);    
     return traits;
   }
   void set_unit_of_measurement(const char *);

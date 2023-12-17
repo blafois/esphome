@@ -51,17 +51,16 @@ void Madoka::control(const ClimateCall &call) {
     }
     ESP_LOGI(TAG, "status: %d, mode: %d", status_, mode_);
     if (mode_ != 255) {
-      this->query(0x4030, message({0x20, 0x01, (uint8_t) mode_}), 600);
+      this->query(BRC1H_FUNC_SET_OPERATION_MODE, message({0x20, 0x01, (uint8_t) mode_}), 600);
     }
-    this->query(0x4020, message({0x20, 0x01, (uint8_t) status_}), 200);
+    this->query(BRC1H_FUNC_SET_SETTING_STATUS, message({0x20, 0x01, (uint8_t) status_}), 200);
   }
-  if (call.get_target_temperature_low().has_value() && call.get_target_temperature_high().has_value()) {
-    uint16_t target_low = *call.get_target_temperature_low() * 128;
-    uint16_t target_high = *call.get_target_temperature_high() * 128;
-    this->query(0x4040,
-                message({0x20, 0x02, (uint8_t)((target_high >> 8) & 0xFF), (uint8_t)(target_high & 0xFF), 0x21, 0x02,
-                         (uint8_t)((target_low >> 8) & 0xFF), (uint8_t)(target_low & 0xFF)}),
-                400);
+  if (call.get_target_temperature().has_value()) {
+        uint16_t target = *call.get_target_temperature() * 128;
+        this->query(BRC1H_FUNC_SET_SETPOINT,
+                    message({0x20, 0x02, (uint8_t)((target >> 8) & 0xFF), (uint8_t)(target & 0xFF), 0x21, 0x02,
+                            (uint8_t)((target >> 8) & 0xFF), (uint8_t)(target & 0xFF)}),
+                    400);   
   }
   this->update();
 }
@@ -150,7 +149,7 @@ void Madoka::update() {
     return;
   }
 
-  std::vector<uint16_t> all_cmds({0x0020, 0x0030, 0x0040, 0x0110});
+  std::vector<uint16_t> all_cmds({ BRC1H_FUNC_GET_SETTING_STATUS, BRC1H_FUNC_GET_OPERATION_MODE, BRC1H_FUNC_GET_SETPOINT, BRC1H_FUNC_GET_FANSPEED, BRC1H_FUNC_GET_SENSOR_INFORMATION});
   for (auto cmd : all_cmds) {
     this->query(cmd, message({0x00, 0x00}), 200);
   }
@@ -254,7 +253,7 @@ void Madoka::parse_cb(message msg) {
   uint8_t sz = msg.size();
 
   switch (f_id) {
-    case 0x0020:
+    case BRC1H_FUNC_GET_SETTING_STATUS:
       while (i < sz) {
         uint8_t a_id = msg[i++];
         uint8_t len = msg[i++];
@@ -264,7 +263,7 @@ void Madoka::parse_cb(message msg) {
         }
         i += len;
       }
-    case 0x0030:
+    case BRC1H_FUNC_GET_OPERATION_MODE:
       while (i < sz) {
         uint8_t a_id = msg[i++];
         uint8_t len = msg[i++];
@@ -278,8 +277,8 @@ void Madoka::parse_cb(message msg) {
       break;
   }
   switch (f_id) {
-    case 0x0020:
-    case 0x0030:
+    case BRC1H_FUNC_GET_SETTING_STATUS:
+    case BRC1H_FUNC_GET_OPERATION_MODE:
       // ESP_LOGI(TAG, "status: %d, mode: %d", this->cur_status_.status, this->cur_status_.mode);
       if (this->cur_status_.status) {
         switch (this->cur_status_.mode) {
@@ -303,28 +302,77 @@ void Madoka::parse_cb(message msg) {
         this->mode = climate::CLIMATE_MODE_OFF;
       }
       break;
-    case 0x0040:
+    case BRC1H_FUNC_GET_SETPOINT:
       while (i < sz) {
         uint8_t a_id = msg[i++];
         uint8_t len = msg[i++];
+        // we need to check the current mode.
+        // if we are in HEATING, we consider heating setpoint
+        // if we are in COOLING, we consider cooling setpoint
+        // if auto ... ?
         switch (a_id) {
-          case 0x20: {
-            message val(msg.begin() + i, msg.begin() + i + len);
-            this->target_temperature_high = (float) (val[0] << 8 | val[1]) / 128;
+          case 0x20: { // Cooling Setpoint
+            if(this->mode == climate::CLIMATE_MODE_COOL) {
+                message val(msg.begin() + i, msg.begin() + i + len);
+                this->target_temperature (float) (val[0] << 8 | val[1]) / 128;
+            }
             break;
           }
-          case 0x21: {
-            message val(msg.begin() + i, msg.begin() + i + len);
-            this->target_temperature_low = (float) (val[0] << 8 | val[1]) / 128;
+          case 0x21: { // Heating Setpoint
+            if(this->mode == climate::CLIMATE_MODE_HEAT) {
+                message val(msg.begin() + i, msg.begin() + i + len);
+                this->target_temperature = (float) (val[0] << 8 | val[1]) / 128;
+            }
             break;
           }
         }
         i += len;
       }
       break;
-    case 0x0050:
-      break;
-    case 0x0110:
+    case BRC1H_FUNC_GET_FANSPEED:
+        // depending on current mode, we consider cooling or heating fanspeed
+        while (i < sz) {
+            uint8_t a_id = msg[i++];
+            uint8_t len = msg[i++];
+            // we need to check the current mode.
+            // if we are in HEATING, we consider heating fanspeed
+            // if we are in COOLING, we consider cooling fanspeed
+            // if auto ... ?
+            switch (a_id) {
+            case 0x20: { // Cooling FanSpeed
+                if(this->mode == climate::CLIMATE_MODE_COOL) {
+                    message val(msg.begin() + i, msg.begin() + i + len);
+                    switch(val[0]) {
+                        case 1: 
+                            this->fan_speed = climate::CLIMATE_FAN_LOW
+                            break;
+                        case 2:
+                        case 3: 
+                        case 4:
+                            this->fan_speed = climate::CLIMATE_FAN_MEDIUM
+                            break;
+                        case 5: 
+                            this->fan_speed = climate::CLIMATE_FAN_HIGH
+                            break;
+                        default:
+                            ESP_LOGW(TAG, "[%s] Unsupported fan speed", this->get_name().c_str());
+                            break;
+                    }
+                }
+                break;
+            }
+            case 0x21: { // Heating FanSpeed
+                if(this->mode == climate::CLIMATE_MODE_HEAT) {
+                    message val(msg.begin() + i, msg.begin() + i + len);
+
+                }
+                break;
+            }
+            }
+            i += len;
+        }
+        break;
+    case BRC1H_FUNC_GET_SENSOR_INFORMATION:
       while (i < sz) {
         uint8_t a_id = msg[i++];
         uint8_t len = msg[i++];
